@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        IMAGE_NAME = 'refalalhazmi/my-app'
-        IMAGE_TAG = 'latest'
+        FRONTEND_IMAGE = 'refalhazmi/frontend-app'
+        BACKEND_IMAGE  = 'refalhazmi/backend-app'
     }
 
     stages {
@@ -20,7 +20,8 @@ pipeline {
             steps {
                 echo 'Building Docker image...'
                 sh """
-                  docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                  docker build -t ${FRONTEND_IMAGE}:latest frontend
+                  docker build -t ${BACKEND_IMAGE}:latest backend
                 """
             }
         }
@@ -39,7 +40,8 @@ pipeline {
             steps {
                 echo 'Pushing Docker image to Docker Hub...'
                 sh """
-                  docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                  docker push ${FRONTEND_IMAGE}:latest
+                  docker push ${BACKEND_IMAGE}:latest
                 """
             }
         }
@@ -49,7 +51,8 @@ pipeline {
         always {
             echo 'Cleaning up local Docker images...'
             sh """
-              docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
+              docker rmi ${FRONTEND_IMAGE}:latest || true
+              docker rmi ${BACKEND_IMAGE}:latest || true
               docker logout
             """
         }
