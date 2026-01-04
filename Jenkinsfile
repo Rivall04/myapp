@@ -20,13 +20,12 @@ pipeline {
             steps {
                 echo 'Building Docker image...'
                 sh """
-                  docker build -t ${FRONTEND_IMAGE}:latest 
-                  docker build -t ${FRONTEND_IMAGE}:$BUILD_NUMBER 
-                  frontend
+                  docker build -t ${FRONTEND_IMAGE}:latest frontend
+                  docker build -t ${FRONTEND_IMAGE}:$BUILD_NUMBER frontend
+                
                   
-                  docker build -t ${BACKEND_IMAGE}:latest 
-                  docker build -t ${BACKEND_IMAGE}:$BUILD_NUMBER 
-                  backend                  
+                  docker build -t ${BACKEND_IMAGE}:latest backend
+                  docker build -t ${BACKEND_IMAGE}:$BUILD_NUMBER backend              
                 """
             }
         }
