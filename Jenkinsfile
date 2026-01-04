@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        FRONTEND_IMAGE = 'refalhazmi/frontend-app'
-        BACKEND_IMAGE  = 'refalhazmi/backend-app'
+        FRONTEND_IMAGE = 'refalalhazmi/frontend-app'
+        BACKEND_IMAGE  = 'refalalhazmi/backend-app'
     }
 
     stages {
