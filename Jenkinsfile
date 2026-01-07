@@ -5,10 +5,10 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         FRONTEND_IMAGE = 'refalalhazmi/frontend-app'
         BACKEND_IMAGE  = 'refalalhazmi/backend-app'
+        VERSION = "1.0.${BUILD_NUMBER}"
     }
 
     stages {
-
         stage('Clone Repo') {
             steps {
                 echo 'Cloning Git repository...'
@@ -16,19 +16,37 @@ pipeline {
             }
         }
 
+	stage('Test'){
+	   steps {
+               echo 'Here we go testing this amazing app...'
+ 	       sh """
+		
+        	  cd frontend && npm install && npm test
+         	  cd ../backend && npm install && npm test
+	       """ }
+
+       }
+
         stage('Build Image') {
             steps {
                 echo 'Building Docker image...'
                 sh """
-                  docker build -t ${FRONTEND_IMAGE}:latest frontend
-                  docker build -t ${FRONTEND_IMAGE}:$BUILD_NUMBER frontend
-                
-                  
-                  docker build -t ${BACKEND_IMAGE}:latest backend
-                  docker build -t ${BACKEND_IMAGE}:$BUILD_NUMBER backend              
+                  docker build -t ${FRONTEND_IMAGE}:${VERSION} frontend
+           
+                  docker build -t ${BACKEND_IMAGE}:${VERSION} backend            
                 """
             }
         }
+
+	stage('Security Scan') {
+	    steps {
+ 	       echo 'Scanning Docker images for vulnerabilities...'
+ 	       sh """
+ 	         trivy image ${FRONTEND_IMAGE}:${VERSION}
+ 	         trivy image ${BACKEND_IMAGE}:${VERSION}
+ 	       """
+ 	   }
+	}
 
         stage('Login to Docker Hub') {
             steps {
@@ -44,10 +62,9 @@ pipeline {
             steps {
                 echo 'Pushing Docker image to Docker Hub...'
                 sh """
-                  docker push ${FRONTEND_IMAGE}:latest
-                  docker push ${FRONTEND_IMAGE}:$BUILD_NUMBER
-                  docker push ${BACKEND_IMAGE}:latest
-                  docker push ${BACKEND_IMAGE}:$BUILD_NUMBER
+                  docker push ${FRONTEND_IMAGE}:${VERSION}
+                  
+                  docker push ${BACKEND_IMAGE}:${VERSION}
                 """
             }
         }
@@ -57,8 +74,8 @@ pipeline {
         always {
             echo 'Cleaning up local Docker images...'
             sh """
-              docker rmi ${FRONTEND_IMAGE}:latest || true
-              docker rmi ${BACKEND_IMAGE}:latest || true
+              docker rmi ${FRONTEND_IMAGE}:${VERSION} || true
+              docker rmi ${BACKEND_IMAGE}:${VERSION} || true
               docker logout
             """
         }
