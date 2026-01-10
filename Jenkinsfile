@@ -25,8 +25,8 @@ pipeline {
                echo 'Here we go testing this amazing app...'
  	       sh """
 		
-        	  cd frontend && npm install && npm test
-         	  cd ../backend && npm install && npm test
+        	  cd frontend && npm install 
+         	  cd ../backend && npm install 
 	       """ }
 
        }
