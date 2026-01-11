@@ -41,16 +41,21 @@ pipeline {
                 """
             }
         }
+		
+		stage('Security Scan') {
+    steps {
+        echo 'Scanning Docker images for vulnerabilities...'
+        sh """
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image ${FRONTEND_IMAGE}:${VERSION}
 
-	stage('Security Scan') {
-	    steps {
- 	       echo 'Scanning Docker images for vulnerabilities...'
- 	       sh """
- 	         trivy image ${FRONTEND_IMAGE}:${VERSION}
- 	         trivy image ${BACKEND_IMAGE}:${VERSION}
- 	       """
- 	   }
-	}
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image ${BACKEND_IMAGE}:${VERSION}
+        """
+    }
+}
 
         stage('Login to Docker Hub') {
             steps {
