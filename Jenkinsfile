@@ -9,13 +9,13 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         FRONTEND_IMAGE = 'refalalhazmi/frontend-app'
         BACKEND_IMAGE  = 'refalalhazmi/backend-app'
-        VERSION = "1.0.${BUILD_NUMBER}"
+        VERSION = "${BRANCH_NAME}-1.0.${BUILD_NUMBER}"
     }
 
     stages {
-        stage('Clone Repo') {
+        stage('Checkout') {
             steps {
-                echo 'Cloning Git repository...'
+                echo ''Building branch: ${BRANCH_NAME}"
                 checkout scm
             }
         }
@@ -68,6 +68,14 @@ pipeline {
         }
 
         stage('Push Image') {
+
+            when {
+                anyOf {
+                    branch 'development'
+                    branch 'staging'
+                }
+            }
+
             steps {
                 echo 'Pushing Docker image to Docker Hub...'
                 sh """
