@@ -15,7 +15,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo ''Building branch: ${BRANCH_NAME}"
+                echo "Building branch: ${env.BRANCH_NAME}"
                 checkout scm
             }
         }
