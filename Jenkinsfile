@@ -100,7 +100,7 @@ pipeline {
 
                     <p><a href="${BUILD_URL}">View Jenkins Build</a></p>
                 """,
-                to: "rivall04@hotmail.com"
+                to: "refalalhazmi0@gmail.com"
             )
         }
 
@@ -115,7 +115,7 @@ pipeline {
 
                     <p><a href="${BUILD_URL}">Check Build Logs</a></p>
                 """,
-                to: "rivall04@hotmail.com"
+                to: "refalalhazmi0@gmail.com"
             )
         }
 
