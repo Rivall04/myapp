@@ -7,8 +7,8 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        FRONTEND_IMAGE = 'refalalhazmi/frontend-app'
-        BACKEND_IMAGE  = 'refalalhazmi/backend-app'
+        DEV_REGISTRY = 'refalalhazmi/dev-app'
+        STAGING_REGISTRY = 'refalalhazmi/staging-app'
         VERSION = "${BRANCH_NAME}-1.0.${BUILD_NUMBER}"
     }
 
@@ -33,12 +33,17 @@ pipeline {
 
         stage('Build Image') {
             steps {
-                echo 'Building Docker image...'
-                sh """
-                  docker build -t ${FRONTEND_IMAGE}:${VERSION} frontend
-           
-                  docker build -t ${BACKEND_IMAGE}:${VERSION} backend            
-                """
+                script {
+                    if (env.BRANCH_NAME == 'development') {
+                        env.IMAGE = "${DEV_REGISTRY}:${VERSION}"
+                    } else if (env.BRANCH_NAME == 'staging') {
+                        env.IMAGE = "${STAGING_REGISTRY}:${VERSION}"
+                    } else {
+                        error("Branch ${BRANCH_NAME} is not handled in this pipeline")
+                    }
+                    echo "Building image ${IMAGE}"
+                    sh "docker build -t ${IMAGE} ."
+                }
             }
         }
 		
@@ -69,30 +74,30 @@ pipeline {
 
         stage('Push Image') {
 
-            when {
-                anyOf {
-                    branch 'development'
-                    branch 'staging'
+			steps {
+                script {
+                
+                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+
+                    def imageExists = sh(script: "docker manifest inspect ${IMAGE}", returnStatus: true)
+
+                    if (imageExists != 0) {
+                        echo "Image ${IMAGE} does not exist. Pushing..."
+                        sh "docker push ${IMAGE}"
+                    } else {
+                        echo "Image ${IMAGE} already exists in registry. Skipping push."
+                    }
+
+                    sh "docker logout"
                 }
             }
-
-            steps {
-                echo 'Pushing Docker image to Docker Hub...'
-                sh """
-                  docker push ${FRONTEND_IMAGE}:${VERSION}
-                  
-                  docker push ${BACKEND_IMAGE}:${VERSION}
-                """
-            }
-        }
     }
 
     post {
         always {
             echo 'Cleaning up local Docker images...'
             sh """
-              docker rmi ${FRONTEND_IMAGE}:${VERSION} || true
-              docker rmi ${BACKEND_IMAGE}:${VERSION} || true
+              sh "docker rmi ${IMAGE} || true"
               docker logout
             """
         }
