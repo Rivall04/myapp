@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: frontend
+spec:
+  replicas: {{ .Values.replicaCount.frontend }}
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: {{ .Values.image.frontend.repository }}:{{ .Values.image.frontend.tag }}   
+        imagePullPolicy: {{ .Values.image.frontend.pullPolicy }}  #kubernetes will not try to pull image from Docker Hub instead, it will be locally 
+        ports:
+        - containerPort: {{ .Values.service.frontend.port }}   # app inside container listen on port 80 
+        env:
+        - name: REACT_APP_API_URL
+          value: "http://backend:3000"  
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: {{ .Values.service.frontend.port }}
+      targetPort: {{ .Values.service.frontend.port }}
+  type: NodePort  #nodeport to make the node exposed by external access
+

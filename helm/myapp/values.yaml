@@ -1,0 +1,55 @@
+# values.yaml - Helm chart default values
+
+# General
+replicaCount:
+  backend: 1
+  frontend: 1
+  postgres: 1
+
+# Images
+image:
+  backend:
+    repository: refalalhazmi/backend-app
+    tag: development-1.0.11
+    pullPolicy: Always
+  frontend:
+    repository: refalalhazmi/frontend-app
+    tag: development-1.0.11
+    pullPolicy: Always
+  postgres:
+    repository: postgres
+    tag: 15-alpine
+
+# Ports
+service:
+  backend:
+    port: 3000
+  frontend:
+    port: 80
+  postgres:
+    port: 5432
+
+# Backend environment variables (from secret)
+backend:
+  env:
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_USER: myappuser
+    DB_PASS: password
+    DB_NAME: myappdb
+
+# Postgres environment variables (from secret)
+postgres:
+  env:
+    POSTGRES_USER: myappuser
+    POSTGRES_PASSWORD: password
+    POSTGRES_DB: myappdb
+  pvc:
+    storage: 1Gi
+    accessModes: 
+      - ReadWriteOnce    
+
+# Secrets
+secret:
+  backendDbSecretName: backend-db-secret
+
