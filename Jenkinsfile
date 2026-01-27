@@ -6,23 +6,54 @@ pipeline {
     }
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        FRONTEND_IMAGE = 'refalalhazmi/frontend-app'
-        BACKEND_IMAGE  = 'refalalhazmi/backend-app'
+        DOCKER_CREDENTIALS = credentials('dockerhub-credentials')
+
+        APP_FRONTEND = 'frontend-app'
+        APP_BACKEND  = 'backend-app'
+
         VERSION = "${BRANCH_NAME}-1.0.${BUILD_NUMBER}"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
-                echo "Building branch: ${env.BRANCH_NAME}"
                 checkout scm
+            }
+        }
+
+        stage('Init Environment') {
+            steps {
+                script {
+                    // Map branch to environment and registry
+                    if (env.BRANCH_NAME == 'development') {
+                        env.ENV_NAME = 'dev'
+                        env.REGISTRY = 'dev-registry.local'
+                    } else if (env.BRANCH_NAME == 'staging') {
+                        env.ENV_NAME = 'staging'
+                        env.REGISTRY = 'staging-registry.local'
+                        env.SOURCE_REGISTRY = 'dev-registry.local'
+                    } else if (env.BRANCH_NAME == 'main') {
+                        env.ENV_NAME = 'prod'
+                        env.REGISTRY = 'prod-registry.local'
+                        env.SOURCE_REGISTRY = 'staging-registry.local'
+                    } else {
+                        error "Unsupported branch: ${BRANCH_NAME}"
+                    }
+
+                    env.FRONTEND_IMAGE = "${REGISTRY}/${APP_FRONTEND}:${VERSION}"
+                    env.BACKEND_IMAGE  = "${REGISTRY}/${APP_BACKEND}:${VERSION}"
+                    env.SOURCE_FRONTEND_IMAGE = env.SOURCE_REGISTRY ? "${SOURCE_REGISTRY}/${APP_FRONTEND}:${VERSION}" : ""
+                    env.SOURCE_BACKEND_IMAGE  = env.SOURCE_REGISTRY ? "${SOURCE_REGISTRY}/${APP_BACKEND}:${VERSION}" : ""
+
+                    echo "Environment: ${ENV_NAME}"
+                    echo "Target Registry: ${REGISTRY}"
+                }
             }
         }
 
         stage('Test') {
             steps {
-                echo 'Here we go testing this amazing app...'
                 sh """
                   cd frontend && npm install && npm run build
                   cd ../backend && npm install
@@ -30,105 +61,75 @@ pipeline {
             }
         }
 
-        stage('Build Image') {
+        stage('Build or Promote Images') {
             steps {
-                echo 'Building Docker image...'
-                sh """
-                  docker build -t ${FRONTEND_IMAGE}:${VERSION} frontend
-                  docker build -t ${BACKEND_IMAGE}:${VERSION} backend
-                """
+                script {
+                    // Check if frontend image exists
+                    def frontendExists = sh(
+                        script: "docker pull ${FRONTEND_IMAGE} || echo 'NOT_FOUND'", 
+                        returnStdout: true
+                    ).trim()
+
+                    // Check if backend image exists
+                    def backendExists = sh(
+                        script: "docker pull ${BACKEND_IMAGE} || echo 'NOT_FOUND'", 
+                        returnStdout: true
+                    ).trim()
+
+                    if (frontendExists.contains('NOT_FOUND') || backendExists.contains('NOT_FOUND')) {
+                        if (env.ENV_NAME == 'dev') {
+                            echo "Building images for DEV..."
+                            sh """
+                              docker build -t ${FRONTEND_IMAGE} frontend
+                              docker build -t ${BACKEND_IMAGE} backend
+                            """
+                        } else {
+                            echo "Promoting images from ${SOURCE_REGISTRY} to ${REGISTRY}..."
+                            sh """
+                              docker pull ${SOURCE_FRONTEND_IMAGE}
+                              docker tag ${SOURCE_FRONTEND_IMAGE} ${FRONTEND_IMAGE}
+                              docker pull ${SOURCE_BACKEND_IMAGE}
+                              docker tag ${SOURCE_BACKEND_IMAGE} ${BACKEND_IMAGE}
+                            """
+                        }
+                    } else {
+                        echo "✅ Images already exist in ${REGISTRY}, skipping build/promotion."
+                        currentBuild.result = 'SUCCESS'
+                        return
+                    }
+                }
             }
         }
 
         stage('Security Scan') {
             steps {
-                echo 'Scanning Docker images for vulnerabilities...'
                 sh """
-                  docker run --rm \
-                    -v /var/run/docker.sock:/var/run/docker.sock \
-                    aquasec/trivy image ${FRONTEND_IMAGE}:${VERSION}
+                  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                    aquasec/trivy image ${FRONTEND_IMAGE}
 
-                  docker run --rm \
-                    -v /var/run/docker.sock:/var/run/docker.sock \
-                    aquasec/trivy image ${BACKEND_IMAGE}:${VERSION}
+                  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                    aquasec/trivy image ${BACKEND_IMAGE}
                 """
             }
         }
 
-        stage('Login to Docker Hub') {
+        stage('Login and Push') {
             steps {
-                echo 'Logging in to Docker Hub...'
                 sh """
-                  echo "${DOCKERHUB_CREDENTIALS_PSW}" | \
-                  docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
-                """
-            }
-        }
-
-        stage('Push Image') {
-            when {
-                anyOf {
-                    branch 'development'
-                    branch 'staging'
-                }
-            }
-            steps {
-                echo 'Pushing Docker image to Docker Hub...'
-                sh """
-                  docker push ${FRONTEND_IMAGE}:${VERSION}
-                  docker push ${BACKEND_IMAGE}:${VERSION}
+                  echo "${DOCKER_CREDENTIALS_PSW}" | docker login -u "${DOCKER_CREDENTIALS_USR}" --password-stdin
+                  docker push ${FRONTEND_IMAGE}
+                  docker push ${BACKEND_IMAGE}
                 """
             }
         }
     }
 
     post {
-        success {
-            emailext(
-                subject: "Jenkins SUCCESS: ${JOB_NAME} #${BUILD_NUMBER}",
-                body: """
-                    <h2>Build Successful :) </h2>
-                    <p><b>Job:</b> ${JOB_NAME}</p>
-                    <p><b>Branch:</b> ${BRANCH_NAME}</p>
-                    <p><b>Version:</b> ${VERSION}</p>
-
-                    <p><b>Docker Images:</b></p>
-                    <ul>
-                        <li>${FRONTEND_IMAGE}:${VERSION}</li>
-                        <li>${BACKEND_IMAGE}:${VERSION}</li>
-                    </ul>
-
-                    <p><a href="${BUILD_URL}">View Jenkins Build</a></p>
-                """,
-                to: "refalalhazmi0@gmail.com",
-                mimeType: 'text/html',
-                from: 'jenkins@localhost'
-            )
-        }
-
-        failure {
-            emailext(
-                subject: "❌ Jenkins FAILED: ${JOB_NAME} #${BUILD_NUMBER}",
-                body: """
-                    <h2>Build Failed :( </h2>
-                    <p><b>Job:</b> ${JOB_NAME}</p>
-                    <p><b>Branch:</b> ${BRANCH_NAME}</p>
-                    <p><b>Build Number:</b> ${BUILD_NUMBER}</p>
-
-                    <p><a href="${BUILD_URL}">Check Build Logs</a></p>
-                """,
-                to: "refalalhazmi0@gmail.com",
-                mimeType: 'text/html',
-                from: 'jenkins@localhost'
-            )
-        }
-
         always {
-            echo 'Cleaning up local Docker images...'
             sh """
-              docker rmi ${FRONTEND_IMAGE}:${VERSION} || true
-              docker rmi ${BACKEND_IMAGE}:${VERSION} || true
-              docker logout
+              docker rmi ${FRONTEND_IMAGE} || true
+              docker rmi ${BACKEND_IMAGE} || true
+              docker logout || true
             """
         }
     }
