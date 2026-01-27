@@ -1,6 +1,6 @@
 pipeline {
-    label 'any'
-    customWorkspace '/opt/jenkins-workspace/refal-app_staging'
+    agent any
+    
     tools {
         nodejs 'NodeJS'
     }
