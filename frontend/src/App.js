@@ -31,7 +31,7 @@ export default function App() {
 
   return (
     <div style={{ padding: 20, fontFamily: 'sans-serif', maxWidth: 500 }}>
-      <h1>MyApp</h1>
+      <h1>Rased DevOps Team Demo</h1>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         <input
